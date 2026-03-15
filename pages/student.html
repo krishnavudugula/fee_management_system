@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BITS Student Portal | Miracle Edition</title>
+    <link rel="stylesheet" href="/styles/student.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="glass-sidebar">
+            <div class="brand-area">
+                <img src="/images/Bits-logo.png" alt="BITS Logo" class="institute-logo">
+            </div>
+            
+            <ul class="nav-menu mt-4">
+                <li class="nav-item active" data-target="dashboard">
+                    <i class="fa-solid fa-house"></i> Home Overview
+                </li>
+                <li class="nav-item" data-target="dues">
+                    <i class="fa-solid fa-list-check"></i> Fee Breakdown
+                </li>
+                <li class="nav-item" data-target="pay">
+                    <i class="fa-solid fa-qrcode"></i> Custom Payment
+                </li>
+                <li class="nav-item" data-target="documents">
+                    <i class="fa-solid fa-file-pdf"></i> Document Center
+                </li>
+            </ul>
+
+            <div class="sidebar-footer mt-auto">
+                <button onclick="logout()" class="btn btn-outline w-100" style="color: var(--danger); border-color: #fecaca;">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Secure Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-workspace">
+            
+            <header class="top-nav glass-nav">
+                <div class="page-context">
+                    <h2 id="top-nav-title">Student Dashboard</h2>
+                </div>
+                
+                <div class="nav-actions">
+                    <a href="/login?role=admin" class="btn btn-outline">
+                        <i class="fa-solid fa-user-shield"></i> Admin Login
+                    </a>
+                    <div class="notification-wrapper">
+                        <button class="icon-btn" onclick="toggleNotifications()">
+                            <i class="fa-solid fa-bell"></i>
+                            <span class="notification-badge pulse" id="notif-count" style="display:none;">0</span>
+                        </button>
+                        
+                        <div class="notification-dropdown" id="notif-dropdown">
+                            <div class="dropdown-header">
+                                <h3>Notifications</h3>
+                                <span class="text-xs text-primary" style="cursor: pointer;" onclick="clearNotifications()">Mark all as read</span>
+                            </div>
+                            <ul class="notification-list" id="notif-list"></ul>
+                        </div>
+                    </div>
+
+                    <div class="student-profile">
+                        <div class="profile-text text-right mr-3">
+                            <strong id="profile-name">Student Name</strong>
+                            <span id="profile-meta">Roll Number | Branch</span>
+                        </div>
+                        <div class="avatar-ring">
+                            <img id="profile-avatar" src="https://ui-avatars.com/api/?name=Student&background=0f172a&color=fff" alt="Profile">
+                            <div class="status-dot active"></div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <section id="view-dashboard" class="view-section active">
+                <header class="page-header mt-3">
+                    <div>
+                        <h1 id="greeting">Welcome back, Student</h1>
+                        <p class="subtitle">Semester 4 Financial Status Overview</p>
+                    </div>
+                    <div class="quick-status danger-glow">
+                        <i class="fa-solid fa-circle-exclamation"></i> Action Required
+                    </div>
+                </header>
+
+                <div class="bento-grid">
+                    <div class="bento-card master-due-card span-2">
+                        <div class="card-content">
+                            <h3>Total Outstanding Balance</h3>
+                            <h1 class="massive-amount" id="dashboard-total-due">₹ 66,500</h1>
+                            <p class="due-date">Due by: <strong>15th March 2026</strong></p>
+                            <button class="btn btn-primary mt-4 btn-lg" onclick="navigateTo('pay')">Pay Custom Amount <i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
+                        <div class="progress-ring-container">
+                            <div class="circular-progress" id="dashboard-progress" style="--progress: 45deg;">
+                                <div class="inner-circle">
+                                    <span id="dashboard-percent">25%</span>
+                                    <small>Paid</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bento-card">
+                        <h3>Recent Activity</h3>
+                        <ul class="activity-timeline mt-3" id="recent-activity">
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-dues" class="view-section">
+                <header class="page-header mt-3">
+                    <h1>Fee Allocation Breakdown</h1>
+                    <p class="subtitle">Transparent view of your institute charges.</p>
+                </header>
+
+                <div class="glass-panel p-0">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>Fee Category</th>
+                                <th>Total Amount</th>
+                                <th>Amount Paid</th>
+                                <th>Pending Due</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dues-table-body">
+                            </tbody>
+                        <tfoot>
+                            <tr>
+                                <td><strong>Grand Total</strong></td>
+                                <td id="table-total"><strong>₹ 1,16,000</strong></td>
+                                <td class="text-success" id="table-paid"><strong>₹ 49,500</strong></td>
+                                <td class="text-danger" style="font-size: 1.2rem;"><strong id="table-due">₹ 66,500</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
+
+            <section id="view-pay" class="view-section">
+                <header class="page-header mt-3">
+                    <h1>Smart Payment Gateway</h1>
+                    <p class="subtitle">Select a category, enter a custom amount, and generate your dynamic payment QR.</p>
+                </header>
+
+                <div class="payment-layout">
+                    
+                    <div class="bento-card" style="align-self: start;">
+                        <h2><i class="fa-solid fa-sliders text-primary"></i> Payment Setup</h2>
+                        <form id="payment-setup-form" class="mt-4">
+                            <div class="form-group">
+                                <label>Select Fee Category to Clear</label>
+                                <select class="form-control" id="pay-category" required onchange="updateMaxAmount()">
+                                    <option value="" disabled selected>Select a pending due...</option>
+                                    </select>
+                            </div>
+                            
+                            <div class="form-group mt-3">
+                                <label>Enter Custom Amount (₹)</label>
+                                <div class="input-with-max">
+                                    <input type="number" id="pay-amount" class="form-control" required placeholder="0" min="500" step="500" oninput="validateAmount()">
+                                    <span class="max-hint" id="max-amount-hint">Max: ₹0</span>
+                                </div>
+                            </div>
+                            
+                            <button type="button" class="btn btn-primary w-100 mt-4 btn-lg" onclick="generateDynamicQR()">
+                                <i class="fa-solid fa-qrcode"></i> Generate Payment QR
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="pos-terminal-container">
+                        
+                        <div id="qr-placeholder" class="bento-card text-center bg-dark text-white" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
+                            <i class="fa-solid fa-expand fa-3x mb-3" style="color: rgba(255,255,255,0.3);"></i>
+                            <h3>Awaiting Payment Details</h3>
+                            <p class="text-sm opacity-70 mt-2">Setup your payment on the left to generate your unique transaction QR.</p>
+                        </div>
+
+                        <div id="qr-active-terminal" class="bento-card border-accent" style="display: none;">
+                            <div class="terminal-header d-flex-between border-bottom pb-3 mb-3">
+                                <div>
+                                    <h3 class="text-primary m-0">BITS UPI Terminal</h3>
+                                    <span class="text-xs text-muted" id="qr-category-label">Tuition Fee Payment</span>
+                                </div>
+                                <h2 class="text-success m-0" id="qr-amount-display">₹ 0</h2>
+                            </div>
+
+                            <div class="qr-display-box text-center mb-4">
+                                <img id="dynamic-qr-img" src="" alt="UPI QR Code" style="width: 200px; height: 200px; border-radius: 10px; border: 1px solid var(--border); padding: 10px;">
+                                <p class="text-sm text-muted mt-3"><i class="fa-solid fa-mobile-screen"></i> Scan with PhonePe, GPay, or Paytm</p>
+                            </div>
+
+                            <form id="secure-pay-form" class="border-top pt-3">
+                                <h4>Verify Transaction</h4>
+                                <div class="form-group mt-2">
+                                    <label>12-Digit UTR Number</label>
+                                    <input type="text" id="pay-utr" class="form-control" required placeholder="e.g., 301234567890">
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>Upload Screenshot</label>
+                                    <input type="file" id="pay-file" class="form-control" required accept="image/*,.pdf">
+                                </div>
+                                <button type="button" class="btn btn-success w-100 mt-3" onclick="submitVerification()">
+                                    <i class="fa-solid fa-shield-check"></i> Submit for Admin Approval
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-documents" class="view-section">
+                <header class="page-header mt-3">
+                    <h1>Document Center</h1>
+                </header>
+                <div class="bento-grid">
+                    <div class="bento-card">
+                        <h3><i class="fa-solid fa-receipt"></i> Official Receipts</h3>
+                        <ul class="doc-list mt-3" id="receipt-list">
+                        </ul>
+                    </div>
+                    <div class="bento-card bg-gradient-success text-white">
+                        <h3><i class="fa-solid fa-certificate"></i> No Dues Certificate</h3>
+                        <p class="mt-2 text-sm opacity-80">This certificate automatically unlocks once your total outstanding balance reaches ₹0.</p>
+                        <button class="btn btn-light mt-4 w-100" id="btn-no-dues" disabled><i class="fa-solid fa-lock"></i> Locked (Dues Pending)</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+    <div class="floating-support" onclick="toggleSupport()">
+        <i class="fa-solid fa-headset"></i>
+    </div>
+
+    <div class="support-widget" id="support-widget">
+        <div class="support-header">
+            <div>
+                <h3>BITS Help Center</h3>
+                <p class="text-xs opacity-70">We typically reply in a few minutes.</p>
+            </div>
+            <button class="icon-btn-small" onclick="toggleSupport()"><i class="fa-solid fa-xmark text-white"></i></button>
+        </div>
+        
+        <div class="support-tabs">
+            <button class="tab-btn active" onclick="switchSupportTab('chat', this)">Live Chat</button>
+            <button class="tab-btn" onclick="switchSupportTab('ticket', this)">Raise Ticket</button>
+        </div>
+
+        <div class="support-body active" id="tab-chat">
+            <div class="chat-area" id="chat-messages">
+                <div class="chat-bubble bot-bubble" id="chat-greeting-bubble"></div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Type your message..." onkeypress="handleChatEnter(event)">
+                <button class="btn btn-primary" style="padding: 10px 15px;" onclick="sendChatMessage()">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="support-body" id="tab-ticket" style="display: none; padding: 20px;">
+            <form id="ticket-form">
+                <div class="form-group mb-3">
+                    <label>Issue Category</label>
+                    <select id="ticket-category" class="form-control" required>
+                        <option value="" disabled selected>Select issue type...</option>
+                        <option>Payment deducted, due not updated</option>
+                        <option>Incorrect Fee Proposed</option>
+                        <option>Technical Error on Portal</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+                <div class="form-group mb-3">
+                    <label>Subject</label>
+                    <input id="ticket-subject" class="form-control" type="text" placeholder="Short summary of your issue" required />
+                </div>
+                <div class="form-group mb-3">
+                    <label>Describe your issue</label>
+                    <textarea id="ticket-description" class="form-control" rows="4" placeholder="Please provide UTR numbers or exact details..." required style="resize: none;"></textarea>
+                </div>
+                <button type="button" class="btn btn-primary w-100" onclick="submitTicket()">Submit Ticket</button>
+            </form>
+        </div>
+    </div>
+    <script src="/scripts/student.js"></script>
+</body>
+</html>

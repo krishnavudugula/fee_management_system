@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BITS Admin</title>
+    <link rel="stylesheet" href="/styles/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="glass-sidebar">
+            <div class="sidebar-header">
+                <i class="fa-solid fa-shield-halved"></i>
+                <h2>Admin Console</h2>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-target="dashboard">
+                    <i class="fa-solid fa-chart-pie"></i> Executive Dashboard
+                </li>
+                <li class="nav-item" data-target="propose-fee">
+                    <i class="fa-solid fa-bullhorn"></i> Propose New Fee
+                </li>
+                <li class="nav-item" data-target="enrollment">
+                    <i class="fa-solid fa-users-viewfinder"></i> Student Enrollment
+                </li>
+                <li class="nav-item" data-target="manage-students">
+                    <i class="fa-solid fa-address-book"></i> Manage Students
+                </li>
+                <li class="nav-item" data-target="verifications">
+                    <i class="fa-solid fa-file-signature"></i> Verification Queue <span class="badge pulse" id="verification-badge" style="display: none;">0</span>
+                </li>
+                <li class="nav-item" data-target="reports">
+                    <i class="fa-solid fa-file-excel"></i> Reports & Exports
+                </li>
+                <li class="nav-item" data-target="support">
+                    <i class="fa-solid fa-headset"></i> Support Desk <span class="badge" id="support-badge" style="display: none;">0</span>
+                </li>
+            </ul>
+             <div class="sidebar-footer mt-auto" style="padding: 20px;">
+                <button onclick="logout()" class="btn btn-outline w-100" style="color: var(--danger); border-color: #fecaca; background: rgba(254, 202, 202, 0.1);">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Admin Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-workspace">
+            <header class="top-nav glass-nav">
+                <div class="brand-logo-area">
+                    <img src="/images/Bits-logo.png" alt="BITS Narsampet Logo" class="institute-logo">
+                </div>
+                <div class="nav-actions">
+                    <a href="/login?role=student" class="btn btn-outline">
+                        <i class="fa-solid fa-user-graduate"></i> Student Login
+                    </a>
+                    <div class="admin-profile">
+                        <div class="avatar-ring">
+                            <img src="https://ui-avatars.com/api/?name=Admin+Office&background=1e293b&color=fff" alt="Admin">
+                        </div>
+                        <div class="profile-text">
+                            <strong>System Admin</strong>
+                            <span>Finance Dept</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <section id="view-dashboard" class="view-section active">
+                <div class="page-header">
+                    <h1>Financial Overview</h1>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon bg-success-light text-success"><i class="fa-solid fa-vault"></i></div>
+                        <div class="stat-details">
+                            <p>Total Paid (Collected)</p>
+                            <h3 id="stat-total-paid">₹ 0</h3>
+                            <div class="progress-mini"><div class="fill success" id="bar-total-paid" style="width: 0%;"></div></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-warning-light text-warning"><i class="fa-solid fa-scale-unbalanced"></i></div>
+                        <div class="stat-details">
+                            <p>Left Due (Outstanding)</p>
+                            <h3 id="stat-total-due">₹ 0</h3>
+                            <div class="progress-mini"><div class="fill warning" id="bar-total-due" style="width: 0%;"></div></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-primary-light text-primary"><i class="fa-solid fa-user-graduate"></i></div>
+                        <div class="stat-details">
+                            <p>Active Enrollments</p>
+                            <h3 id="stat-active-enrollments">0</h3>
+                            <span class="text-xs text-muted">Across all branches</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <div class="panel-header-complex">
+                        <h2>Fee Dues & Alerts</h2>
+                        <div class="filter-controls">
+                            <div class="range-inputs">
+                                <input type="number" id="min-due" class="form-control form-sm" placeholder="Min Due (₹)">
+                                <span>-</span>
+                                <input type="number" id="max-due" class="form-control form-sm" placeholder="Max Due (₹)">
+                                <button class="btn btn-outline btn-sm" onclick="applyRangeFilter()">Filter Range</button>
+                            </div>
+                            <button class="btn btn-warning" onclick="triggerBulkAlert()"><i class="fa-solid fa-bell"></i> Alert Filtered List</button>
+                        </div>
+                    </div>
+
+                    <table class="modern-table mt-3">
+                        <thead>
+                            <tr>
+                                <th>Student Details</th>
+                                <th>Branch</th>
+                                <th>Pending Amount</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="defaulter-table">
+                            </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="view-propose-fee" class="view-section">
+                <div class="page-header">
+                    <h1>Propose Ad-hoc Fee</h1>
+                    <p class="subtitle">Issue new fee requirements for events, workshops, or fines instantly.</p>
+                </div>
+                
+                <div class="glass-panel propose-fee-container mb-4">
+                    <div class="propose-graphic">
+                        <i class="fa-solid fa-money-check-dollar fa-5x text-primary" style="opacity: 0.2;"></i>
+                    </div>
+                    <form id="propose-fee-form" class="propose-form">
+                        <div class="form-group">
+                            <label>Fee Title / Description</label>
+                            <input type="text" id="fee-desc" class="form-control" required placeholder="e.g., AI & ML 2-Day Workshop Fee">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Amount (₹)</label>
+                                <input type="number" id="fee-amount" class="form-control" required placeholder="e.g., 1500">
+                            </div>
+                            <div class="form-group">
+                                <label>Target Audience</label>
+                                <select id="fee-target" class="form-control" required>
+                                    <option value="ALL">All Active Students (Institute-wide)</option>
+                                    <option value="CSE">Computer Science Engineering (CSE)</option>
+                                    <option value="CSD">Computer Science and Design (CSD)</option>
+                                    <option value="AI&ML">Artificial Intelligence and Machine Learning (AI&ML)</option>
+                                    <option value="SE">Software Engineering</option>
+                                    <option value="EEE">Electrical & Electronics Engineering (EEE)</option>
+                                    <option value="ME">Mechanical Engineering (ME)</option>
+                                    <option value="CE">Civil Engineering (CE)</option>
+                                    <option value="ECE">Electronics & Communication Engineering (ECE)</option>
+                                    <option value="DSE">Data Science Engineering</option>
+                                    <option value="IoT">Internet of Things (IoT)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-lg w-100 mt-3" onclick="confirmFeeProposal()">
+                            <i class="fa-solid fa-paper-plane"></i> Update & Push to Students
+                        </button>
+                    </form>
+                </div>
+
+                <div class="glass-panel p-0">
+                    <div class="panel-header-complex p-4 border-bottom">
+                        <h2><i class="fa-solid fa-clock-rotate-left text-muted"></i> Recent Fee Proposals</h2>
+                    </div>
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th>Date Issued</th>
+                                <th>Fee Title</th>
+                                <th>Target Group</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fee-history-table">
+                            </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="view-enrollment" class="view-section">
+                <div class="page-header">
+                    <h1>Student Registration</h1>
+                </div>
+                
+                <div class="glass-panel p-0 mb-4">
+                    <div class="enrollment-bento">
+                        <div class="enroll-details p-4">
+                            <h2><i class="fa-solid fa-user-plus text-primary"></i> Single Registration</h2> <br>
+                            <p class="text-sm text-muted mt-2 mb-4">Create a new student profile and set their initial academic parameters.</p> <br>
+                            
+                            <form id="single-enroll-form">
+                                <div class="form-group">
+                                    <label>Full Name</label>
+                                    <input type="text" class="form-control" required placeholder="Student Name">
+                                </div>
+                                <div class="form-row mt-3">
+                                    <div class="form-group">
+                                        <label>Roll Number</label>
+                                        <input type="text" class="form-control" required placeholder="e.g. 21U41A0501">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Branch</label>
+                                        <select class="form-control" required>
+                                            <option value="" disabled selected>Select Branch</option>
+                                            <option value="CSE">CSE</option>
+                                            <option value="CSD">CSD</option>
+                                            <option value="AI&ML">AI&ML</option>
+                                            <option value="IT">IT</option>
+                                            <option value="ECE">ECE</option>
+                                            <option value="CIVIL">CIVIL</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-3">
+                                    <label>Initial Password</label>
+                                    <input type="text" class="form-control" required placeholder="Set default password" value="bits@123">
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="enroll-fees p-4 bg-gradient-light border-left">
+                            <h2><i class="fa-solid fa-file-invoice-dollar text-primary"></i> Allocate Base Fees</h2> <br>
+                            <p class="text-sm text-muted mt-2 mb-4">Select the applicable fee categories for this student's current semester.</p> <br>
+                            
+                            <div class="fee-toggles">
+                                <label class="custom-checkbox">
+                                    <input type="checkbox" class="fee-calc-check" data-amount="65000" checked disabled>
+                                    <span class="checkmark"></span>
+                                    <div class="fee-name">Tuition Fee <span>₹65,000</span></div>
+                                </label>
+                                <label class="custom-checkbox">
+                                    <input type="checkbox" class="fee-calc-check" data-amount="2500" checked>
+                                    <span class="checkmark"></span>
+                                    <div class="fee-name">Examination Fee <span>₹2,500</span></div>
+                                </label>
+                                <label class="custom-checkbox">
+                                    <input type="checkbox" class="fee-calc-check" data-amount="1500" checked>
+                                    <span class="checkmark"></span>
+                                    <div class="fee-name">Library Fee <span>₹1,500</span></div>
+                                </label>
+                                <label class="custom-checkbox">
+                                    <input type="checkbox" class="fee-calc-check" data-amount="2000" checked>
+                                    <span class="checkmark"></span>
+                                    <div class="fee-name">Student Activity Fee <span>₹2,000</span></div>
+                                </label>
+                                <label class="custom-checkbox">
+                                    <input type="checkbox" class="fee-calc-check" data-amount="45000">
+                                    <span class="checkmark"></span>
+                                    <div class="fee-name">Hostel Fee <span>₹45,000</span></div>
+                                </label>
+                                <label class="custom-checkbox">
+                                    <input type="checkbox" class="fee-calc-check" data-amount="18000">
+                                    <span class="checkmark"></span>
+                                    <div class="fee-name">Transportation / Bus <span>₹18,000</span></div>
+                                </label>
+                            </div>
+
+                            <div class="total-calculator mt-4">
+                                <span>Initial Total Due:</span>
+                                <h2 id="live-total">₹ 71,000</h2>
+                            </div>
+                            
+                            <button type="button" class="btn btn-primary w-100 mt-4 btn-lg" id="btn-register-single" onclick="registerSingleStudent()">
+                                <i class="fa-solid fa-check-circle"></i> Create Account & Assign Fees
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel text-center p-4">
+                    <h2><i class="fa-solid fa-file-csv text-accent"></i> Bulk Batch Import</h2> <br>
+                    <p class="text-sm text-muted mt-2 mb-4">Upload an Excel/CSV file to instantly generate accounts and allocate base fees for hundreds of students at once.</p> <br>
+                    
+                    <label class="dropzone mx-auto" id="csv-dropzone" style="max-width: 600px;">
+                        <i class="fa-solid fa-cloud-arrow-up fa-3x text-accent mb-3"></i>
+                        <h4>Drag & Drop your .csv file</h4>
+                        <span class="text-muted text-sm">or click to browse</span>
+                        <input type="file" accept=".csv" hidden onchange="processBulkUpload(this)">
+                    </label>
+
+                    <div id="upload-progress" class="upload-progress mx-auto" style="max-width: 600px;">
+                        <div class="d-flex-between">
+                            <strong class="text-primary" id="upload-status">Parsing rows...</strong>
+                            <span id="upload-percent">0%</span>
+                        </div>
+                        <div class="progress-bar-bg mt-2">
+                            <div class="progress-bar-fill" id="upload-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-manage-students" class="view-section">
+                <div class="page-header">
+                    <h1>Student Management & Profile Directory</h1>
+                    <p class="subtitle">View and manage student profiles, filter by department, and search by name or roll number.</p>
+                </div>
+
+                <div class="glass-panel">
+                    <div class="panel-header-complex">
+                        <h2>Filter & Search Students</h2>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label>Filter by Department</label>
+                            <select id="filter-department" class="form-control" onchange="filterStudents()">
+                                <option value="">All Departments</option>
+                                <option value="CSE">Computer Science Engineering (CSE)</option>
+                                <option value="CSD">Computer Science and Design (CSD)</option>
+                                <option value="AI&ML">Artificial Intelligence & ML (AI&ML)</option>
+                                <option value="IT">Information Technology (IT)</option>
+                                <option value="ECE">Electronics & Communication (ECE)</option>
+                                <option value="CIVIL">Civil Engineering</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Search by Name</label>
+                            <input type="text" id="search-name" class="form-control" placeholder="Enter student name" onkeyup="filterStudents()">
+                        </div>
+                        <div class="form-group">
+                            <label>Search by Roll Number</label>
+                            <input type="text" id="search-roll" class="form-control" placeholder="Enter roll number" onkeyup="filterStudents()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-0">
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th>Student Profile</th>
+                                <th>Roll Number</th>
+                                <th>Branch</th>
+                                <th>Total Due</th>
+                                <th>Paid Amount</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="students-table-body">
+                            <tr style="text-align: center; padding: 20px;">
+                                <td colspan="6" style="color: var(--text-muted); padding: 30px;">Loading student data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+             <section id="view-verifications" class="view-section">
+                <div class="page-header">
+                    <h1>Payment Verification Queue</h1>
+                    <button class="btn btn-success" id="bulk-approve-btn" disabled onclick="confirmBulkApprove()">
+                        <i class="fa-solid fa-check-double"></i> Approve Selected (<span id="selected-count">0</span>)
+                    </button>
+                </div>
+                
+                <div class="glass-panel p-0">
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th width="50"><input type="checkbox" id="select-all" class="custom-chk" onclick="toggleSelectAll(this)"></th>
+                                <th>Date submitted</th>
+                                <th>Student Details</th>
+                                <th>Amount / UTR</th>
+                                <th>Proof</th>
+                            </tr>
+                        </thead>
+                        <tbody id="verification-table">
+                            </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="view-reports" class="view-section">
+                <div class="page-header">
+                    <h1>Reports & Data Exports</h1>
+                    <p class="subtitle">Generate database-synced Excel reports for outstanding student dues.</p>
+                </div>
+
+                <div class="glass-panel propose-fee-container">
+                    <div class="propose-graphic">
+                        <i class="fa-solid fa-file-excel fa-5x text-success" style="opacity: 0.8;"></i>
+                    </div>
+                    <div class="propose-form">
+                        <h2>Branch-Wise Due Report</h2>
+                        <p class="text-sm text-muted mb-4">Export the current outstanding dues of registered students. Amounts shown are synced live (Total Fee - Paid Amount).</p>
+                        
+                        <div class="form-group">
+                            <label>Select Department / Branch</label>
+                            <select id="export-branch" class="form-control" required>
+                                <option value="" disabled selected>Select Branch...</option>
+                                <option value="CSE">Computer Science Engineering (CSE)</option>
+                                <option value="CSD">Computer Science and Design (CSD)</option>
+                                <option value="AI&ML">Artificial Intelligence and Machine Learning (AI&ML)</option>
+                                <option value="SE">Software Engineering</option>
+                                <option value="EEE">Electrical & Electronics Engineering (EEE)</option>
+                                <option value="ME">Mechanical Engineering (ME)</option>
+                                <option value="CE">Civil Engineering (CE)</option>
+                                <option value="ECE">Electronics & Communication Engineering (ECE)</option>
+                                <option value="DSE">Data Science Engineering</option>
+                                <option value="IoT">Internet of Things (IoT)</option> 
+                                <option value="ALL">All Branches (Full Institute)</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-success btn-lg w-100 mt-3" id="btn-download-excel" onclick="downloadBranchReport()">
+                            <i class="fa-solid fa-download"></i> Generate & Download Excel (.xlsx)
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-support" class="view-section">
+                <div class="page-header">
+                    <h1>Resolution Center</h1>
+                    <p class="subtitle">Manage and resolve student support tickets and inquiries.</p>
+                </div>
+
+                <div class="support-layout">
+                    <div class="glass-panel p-0 inbox-panel">
+                        <div class="panel-header-complex p-3 border-bottom">
+                            <h3 class="text-sm">Open Tickets</h3>
+                            <i class="fa-solid fa-filter text-muted" style="cursor: pointer;"></i>
+                        </div>
+                        <ul class="ticket-list" id="ticket-list">
+                            </ul>
+                    </div>
+
+                    <div class="glass-panel p-0 thread-panel">
+                        <div id="empty-thread" class="empty-state text-center p-5">
+                            <i class="fa-solid fa-inbox fa-4x text-muted mb-3 opacity-70"></i>
+                            <h3 class="text-muted">Select a ticket to view details</h3>
+                        </div>
+
+                        <div id="active-thread" style="display: none; height: 100%; flex-direction: column;">
+                            <div class="thread-header border-bottom p-4 d-flex-between">
+                                <div>
+                                    <h2 id="thread-subject" class="text-primary mb-1">Issue Subject</h2>
+                                    <p class="text-sm text-muted">From: <strong id="thread-student">Student Name</strong> | Ticket <span id="thread-id">#000</span></p>
+                                </div>
+                                <button class="btn btn-success" onclick="resolveTicket()"><i class="fa-solid fa-check"></i> Mark Resolved</button>
+                            </div>
+                            
+                            <div class="thread-body p-4" id="thread-messages">
+                                <div class="message-box student-msg">
+                                    <p id="thread-desc">Description of the issue goes here.</p>
+                                </div>
+                            </div>
+
+                            <div class="thread-reply p-4 border-top bg-main">
+                                <textarea id="response-area" class="form-control" rows="3" placeholder="Type your reply to the student..." style="resize: none;"></textarea>
+                                <div class="d-flex-between mt-2">
+                                    <button class="btn btn-outline btn-sm"><i class="fa-solid fa-paperclip"></i> Attach File</button>
+                                    <div class="d-flex-between" style="gap: 10px;">
+                                        <button class="btn btn-warning" onclick="updateTicketStatus('IN_PROGRESS')">Mark In Progress</button>
+                                        <button class="btn btn-primary" onclick="updateTicketStatus('IN_PROGRESS')">Send Reply <i class="fa-solid fa-paper-plane"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-content text-center">
+            <div class="modal-icon" id="modal-icon"><i class="fa-solid fa-circle-exclamation text-warning"></i></div>
+            <h2 class="mt-3" id="modal-title">Confirm Action</h2>
+            <p class="text-muted text-sm mt-2 mb-4" id="modal-desc">Are you sure you want to proceed?</p>
+            <div class="modal-actions">
+                <button class="btn btn-outline w-100" onclick="closeConfirmModal()">Cancel</button>
+                <button class="btn btn-primary w-100" id="modal-confirm-btn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+    <script src="/scripts/admin.js"></script>
+</body>
+</html>

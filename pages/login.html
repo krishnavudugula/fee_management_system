@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BITS Narsampet | Secure Login</title>
+    <link rel="stylesheet" href="/styles/login.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="auth-layout">
+        <div class="auth-hero">
+            <div class="hero-overlay"></div>
+            <div class="hero-content">
+                <div class="brand-text">
+                    <h1>Seamless Fee<br>Management.</h1>
+                    <p>The official, unified financial portal for BITS Narsampet. Track dues, verify payments, and manage institute accounts in real-time.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-form-area">
+            <div class="form-wrapper">
+                <div class="logo-container">
+                    <img src="/images/Bits-logo.png" alt="BITS Narsampet Logo">
+                </div>
+                <div class="form-header">
+                    <h2>Welcome back</h2>
+                    <p>Please select your role and enter your details to sign in.</p>
+                </div>
+
+                <div class="role-toggle">
+                    <div class="toggle-indicator" id="toggle-bg"></div>
+                    <button class="toggle-btn active" id="btn-student" onclick="setRole('student')">Student</button>
+                    <button class="toggle-btn" id="btn-admin" onclick="setRole('admin')">Admin</button>
+                </div>
+
+                <div class="form-slider-viewport">
+                    <div class="form-slider-track" id="form-track">
+                        <form id="student-form" class="login-form">
+                            <div class="input-group">
+                                <label>Student ID (Roll No)</label>
+                                <div class="input-with-icon">
+                                    <i class="fa-regular fa-id-card"></i>
+                                    <input type="text" required placeholder="e.g. 21U41A0501">
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label>Password</label>
+                                <div class="input-with-icon">
+                                    <i class="fa-solid fa-lock"></i>
+                                    <input type="password" required placeholder="••••••••">
+                                </div>
+                            </div>
+                            <div class="form-options">
+                                <label class="checkbox-container">
+                                    <input type="checkbox"><span class="checkmark"></span> Remember me
+                                </label>
+                                <a href="#" class="forgot-link" onclick="openForgotModal()">Forgot Password?</a>
+                            </div>
+                            <button type="submit" class="btn-submit">
+                                <span>Sign In as Student</span> <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </form>
+
+                        <form id="admin-form" class="login-form">
+                            <div class="input-group">
+                                <label>Admin Email or ID</label>
+                                <div class="input-with-icon">
+                                    <i class="fa-solid fa-shield-halved"></i>
+                                    <input type="text" required placeholder="admin@bitsnarsampet.ac.in">
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label>Secure Password</label>
+                                <div class="input-with-icon">
+                                    <i class="fa-solid fa-lock"></i>
+                                    <input type="password" required placeholder="••••••••">
+                                </div>
+                            </div>
+                            <div class="form-options">
+                                <label class="checkbox-container">
+                                    <input type="checkbox"><span class="checkmark"></span> Remember me
+                                </label>
+                                <a href="#" class="forgot-link" onclick="openForgotModal()">Forgot Password?</a>
+                            </div>
+                            <button type="submit" class="btn-submit admin-btn">
+                                <span>Access Admin Console</span> <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="secure-footer">
+                    <i class="fa-solid fa-lock"></i> Secured by BITS IT Cell.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="forgot-modal" class="modal-overlay">
+        <div class="modal-content" style="width: 400px;">
+            <div class="modal-header">
+                <h2 id="forgot-title">Reset Password</h2>
+                <i class="fa-solid fa-xmark close-icon" onclick="closeForgotModal()"></i>
+            </div>
+            
+            <div id="step-email" class="forgot-step active">
+                <p class="text-muted text-sm mb-3">Enter your registered institution email to receive a 6-digit OTP.</p>
+                <input type="email" class="form-control mb-3" placeholder="Enter Email" id="reset-email">
+                <button class="btn-submit w-100" onclick="nextForgotStep(1)">Send OTP</button>
+            </div>
+
+            <div id="step-otp" class="forgot-step">
+                <p class="text-muted text-sm mb-3">Enter the 6-digit OTP sent to your email.</p>
+                <input type="text" class="form-control mb-3" placeholder="------" style="text-align: center; letter-spacing: 5px; font-weight: bold;">
+                <button class="btn-submit w-100" onclick="nextForgotStep(2)">Verify OTP</button>
+            </div>
+
+            <div id="step-new-pass" class="forgot-step">
+                <p class="text-muted text-sm mb-3">Create a new secure password.</p>
+                <input type="password" class="form-control mb-2" placeholder="New Password">
+                <input type="password" class="form-control mb-3" placeholder="Confirm Password">
+                <button class="btn-submit w-100" onclick="nextForgotStep(3)">Update Password</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+    <script src="/scripts/login.js"></script>
+</body>
+</html>
