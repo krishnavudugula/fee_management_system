@@ -252,6 +252,7 @@
         <div class="support-tabs">
             <button class="tab-btn active" onclick="switchSupportTab('chat', this)">Live Chat</button>
             <button class="tab-btn" onclick="switchSupportTab('ticket', this)">Raise Ticket</button>
+            <button class="tab-btn" onclick="switchSupportTab('history', this)">My Tickets</button>
         </div>
 
         <div class="support-body active" id="tab-chat">
@@ -266,10 +267,10 @@
             </div>
         </div>
 
-        <div class="support-body" id="tab-ticket" style="display: none; padding: 20px;">
-            <form id="ticket-form">
-                <div class="form-group mb-3">
-                    <label>Issue Category</label>
+        <div class="support-body" id="tab-ticket" style="display: none; padding: 20px; flex-direction: column;">
+            <form id="ticket-form" style="display: flex; flex-direction: column; gap: 15px; height: 100%;">
+                <div class="form-group mb-2">
+                    <label style="font-weight: 600; margin-bottom: 5px; display: block;">Issue Category <span style="color: #ef4444;">*</span></label>
                     <select id="ticket-category" class="form-control" required>
                         <option value="" disabled selected>Select issue type...</option>
                         <option>Payment deducted, due not updated</option>
@@ -278,16 +279,25 @@
                         <option>Other</option>
                     </select>
                 </div>
-                <div class="form-group mb-3">
-                    <label>Subject</label>
+                <div class="form-group mb-2">
+                    <label style="font-weight: 600; margin-bottom: 5px; display: block;">Subject <span style="color: #ef4444;">*</span></label>
                     <input id="ticket-subject" class="form-control" type="text" placeholder="Short summary of your issue" required />
                 </div>
-                <div class="form-group mb-3">
-                    <label>Describe your issue</label>
-                    <textarea id="ticket-description" class="form-control" rows="4" placeholder="Please provide UTR numbers or exact details..." required style="resize: none;"></textarea>
+                <div class="form-group mb-2" style="flex: 1; display: flex; flex-direction: column;">
+                    <label style="font-weight: 600; margin-bottom: 5px; display: block;">Describe your issue <span style="color: #ef4444;">*</span></label>
+                    <textarea id="ticket-description" class="form-control" placeholder="Please provide UTR numbers or exact details..." required style="resize: none; flex: 1; min-height: 120px;"></textarea>
                 </div>
-                <button type="button" class="btn btn-primary w-100" onclick="submitTicket()">Submit Ticket</button>
+                <div style="display: flex; gap: 10px; margin-top: auto;">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('ticket-form').reset(); showToast('Form cleared', 'info')" style="flex: 1;">Clear</button>
+                    <button type="button" class="btn btn-primary" onclick="submitTicket()" style="flex: 1; font-size: 1rem; padding: 12px; font-weight: 600;"><i class="fa-solid fa-paper-plane" style="margin-right: 8px;"></i> Send Ticket</button>
+                </div>
             </form>
+        </div>
+
+        <div class="support-body" id="tab-history" style="display: none; padding: 20px; overflow-y: auto; max-height: calc(100% - 110px);">
+            <div id="student-tickets-list">
+                <p class="text-sm text-muted text-center mt-4"><i class="fa-solid fa-spinner fa-spin"></i> Loading tickets...</p>
+            </div>
         </div>
     </div>
     <script src="/scripts/student.js"></script>

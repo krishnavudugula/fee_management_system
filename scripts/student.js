@@ -322,10 +322,10 @@ async function loadNotifications() {
 
         const data = await response.json();
         const all = data.notifications || [];
-        // Show all relevant notifications: PAYMENT, ALERT, and verification results
-        notificationsData = all.filter(n => {
-            if (n && typeof n.type === 'string') {
-                return n.type === 'PAYMENT' || n.type === 'ALERT';
+          // Show all relevant notifications: PAYMENT, ALERT, INFO and verification results
+          notificationsData = all.filter(n => {
+              if (n && typeof n.type === 'string') {
+                  return n.type === 'PAYMENT' || n.type === 'ALERT' || n.type === 'INFO';
             }
             // Backward compatible: if `type` is missing, keep payment-related notifications
             const title = (n && n.title ? String(n.title) : '').toLowerCase();
@@ -527,19 +527,49 @@ const chatInput = document.getElementById('chat-input');
 
 function initializeChatbot() {
     if (!chatMessages) return;
-    const bubble = document.getElementById('chat-greeting-bubble');
-    const firstName = currentStudentProfile.firstName || 'there';
-    const branchNote = currentStudentProfile.branch ? ` (${currentStudentProfile.branch})` : '';
-    const greeting = `Hi ${firstName}! I'm the BITS Support Bot${branchNote}. I can help with payments, receipts, or tickets. Ask a question or switch to Raise Ticket to alert admins.`;
+    
+    // Clear existing messages except greeting
+    chatMessages.innerHTML = '';
+    
+    // Load chat history from localStorage
+    const chatHistory = JSON.parse(localStorage.getItem(`chat_${currentStudentId}`) || '[]');
+    
+    if (chatHistory.length === 0) {
+        // New chat - show greeting
+        const firstName = currentStudentProfile.firstName || 'there';
+        const branchNote = currentStudentProfile.branch ? ` (${currentStudentProfile.branch})` : '';
+        const greeting = `Hi ${firstName}! I'm the BITS Support Bot${branchNote}. I can help with payments, receipts, or tickets. Ask a question or switch to Raise Ticket to alert admins.`;
 
-    if (bubble) {
-        bubble.innerText = greeting;
-    } else {
         const div = document.createElement('div');
         div.className = 'chat-bubble bot-bubble';
         div.id = 'chat-greeting-bubble';
         div.innerText = greeting;
-        chatMessages.prepend(div);
+        chatMessages.appendChild(div);
+    } else {
+        // Show chat history
+        chatHistory.forEach(msg => {
+            let div = document.createElement('div');
+            div.className = msg.type === 'user' ? 'chat-bubble user-bubble' : 'chat-bubble bot-bubble';
+            div.innerText = msg.text;
+            chatMessages.appendChild(div);
+        });
+        
+        // Add clear chat button
+        const clearBtn = document.createElement('div');
+        clearBtn.style.cssText = 'text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;';
+        clearBtn.innerHTML = '<button onclick="clearChatHistory()" style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Clear Chat History</button>';
+        chatMessages.appendChild(clearBtn);
+    }
+    
+    // Auto-scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function clearChatHistory() {
+    if (confirm('Clear all chat history?')) {
+        localStorage.removeItem(`chat_${currentStudentId}`);
+        initializeChatbot();
+        showToast('Chat history cleared', 'success');
     }
 }
 
@@ -556,8 +586,12 @@ function switchSupportTab(tabName, buttonEl) {
 
     document.getElementById('tab-chat').style.display = tabName === 'chat' ? 'flex' : 'none';
     document.getElementById('tab-ticket').style.display = tabName === 'ticket' ? 'block' : 'none';
+    
+    const historyTab = document.getElementById('tab-history');
+    if (historyTab) historyTab.style.display = tabName === 'history' ? 'block' : 'none';
 
     if (tabName === 'chat') initializeChatbot();
+    if (tabName === 'history') loadMyTickets();
 }
 
 function handleChatEnter(e) {
@@ -605,6 +639,11 @@ function sendChatMessage() {
     chatInput.value = '';
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
+    // Save to localStorage
+    const chatHistory = JSON.parse(localStorage.getItem(`chat_${currentStudentId}`) || '[]');
+    chatHistory.push({ type: 'user', text: text, timestamp: new Date().toISOString() });
+    localStorage.setItem(`chat_${currentStudentId}`, JSON.stringify(chatHistory));
+
     // 2. Simulate Bot "Typing..."
     const typingId = 'typing-' + Date.now();
     chatMessages.innerHTML += `<div class="typing-indicator" id="${typingId}">Agent is typing...</div>`;
@@ -613,8 +652,14 @@ function sendChatMessage() {
     // 3. Bot Reply
     setTimeout(() => {
         document.getElementById(typingId).remove();
-        chatMessages.innerHTML += `<div class="chat-bubble bot-bubble">${getBotReply(text)}</div>`;
+        const reply = getBotReply(text);
+        chatMessages.innerHTML += `<div class="chat-bubble bot-bubble">${reply}</div>`;
         chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Save bot reply to localStorage
+        const updatedHistory = JSON.parse(localStorage.getItem(`chat_${currentStudentId}`) || '[]');
+        updatedHistory.push({ type: 'bot', text: reply, timestamp: new Date().toISOString() });
+        localStorage.setItem(`chat_${currentStudentId}`, JSON.stringify(updatedHistory));
     }, 1500);
 }
 
@@ -650,10 +695,264 @@ async function submitTicket() {
 
         showToast(`Ticket ${data.ticket_number} submitted successfully.`, "success");
         form.reset();
-        setTimeout(toggleSupport, 1000);
+        // Auto-switch to history to see the new ticket
+        const historyBtn = document.querySelector('.tab-btn:nth-child(3)');
+        if (historyBtn) switchSupportTab('history', historyBtn);
+        else setTimeout(toggleSupport, 1000);
     } catch (error) {
         showToast(error.message || 'Ticket submission failed.', 'error');
     }
+}
+
+async function loadMyTickets() {
+    const container = document.getElementById('student-tickets-list');
+    if (!container || !currentStudentId) return;
+
+    container.innerHTML = '<p class="text-sm text-muted text-center mt-4"><i class="fa-solid fa-spinner fa-spin"></i> Loading tickets...</p>';
+    
+    try {
+        const response = await fetch(`http://127.0.0.1:8000/api/student/my-tickets/${currentStudentId}`);
+        if (!response.ok) throw new Error('Failed to load tickets');
+        
+        const data = await response.json();
+        const tickets = data.tickets || [];
+        
+        if (tickets.length === 0) {
+            container.innerHTML = `
+                <div class="text-center mt-4">
+                    <i class="fa-regular fa-folder-open fa-3x" style="color: var(--text-muted); opacity: 0.5;"></i>
+                    <p class="text-muted mt-2">No tickets raised yet.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '<div style="display: flex; flex-direction: column; gap: 10px;" id="ticket-cards-container">';
+        tickets.forEach((t, idx) => {
+            const statusColor = t.status === 'OPEN' ? '#3b82f6' : 
+                                t.status === 'IN_PROGRESS' ? '#f59e0b' : 
+                                t.status === 'RESOLVED' ? '#10b981' : '#6b7280';
+            
+            html += `
+                <div class="ticket-card" onclick="openTicketThread(${idx})" style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid ${statusColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s; data-ticket-idx='${idx}'">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-weight: 600; color: var(--primary); font-size: 0.9rem;">${t.ticket_number}</span>
+                        <span style="background: ${statusColor}20; color: ${statusColor}; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">${t.status}</span>
+                    </div>
+                    <div style="font-weight: 600; margin-bottom: 5px; color: var(--text-main);">${t.subject}</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px;">${t.category} • ${t.created_at}</div>
+                    ${t.admin_response ? '<div style="font-size: 0.8rem; color: #10b981; margin-top: 5px;"><i class="fa-solid fa-reply"></i> Admin replied</div>' : ''}
+                </div>
+            `;
+        });
+        html += '</div>';
+        
+        container.innerHTML = html;
+        
+        // Add hover effect with CSS
+        const style = document.createElement('style');
+        style.textContent = `
+            .ticket-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        `;
+        document.head.appendChild(style);
+        
+        window.studentTickets = tickets; // Store for access
+        
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = '<p class="text-center text-danger mt-4">Failed to load tickets.</p>';
+    }
+}
+
+let currentOpenTicket = null;
+
+async function openTicketThread(ticketIdx) {
+    const ticket = window.studentTickets[ticketIdx];
+    if (!ticket) return;
+    
+    currentOpenTicket = ticket;
+    
+    const container = document.getElementById('student-tickets-list');
+    const statusColor = ticket.status === 'OPEN' ? '#3b82f6' : 
+                        ticket.status === 'IN_PROGRESS' ? '#f59e0b' : 
+                        ticket.status === 'RESOLVED' ? '#10b981' : '#6b7280';
+    
+    // Show a loading UI while fetching messages
+    container.innerHTML = `
+        <div style="display: flex; justify-content: center; align-items: center; height: 100%;">
+            <p>Loading chat...</p>
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`http://127.0.0.1:8000/api/ticket/${ticket.id}/messages`);
+        const data = await response.json();
+        const messages = data.messages || [];
+
+    let html = `
+        <div style="display: flex; flex-direction: column; height: 100%; gap: 0;">
+            <!-- Back Button + Header -->
+            <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button onclick="loadMyTickets()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--primary);">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">${ticket.ticket_number}</div>
+                        <div style="font-weight: 600; color: var(--primary);">${ticket.subject}</div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button onclick="deleteTicket(${ticket.id})" style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                    <span style="background: ${statusColor}20; color: ${statusColor}; padding: 6px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">${ticket.status}</span>
+                </div>
+            </div>
+            
+            <!-- Thread Messages -->
+            <div id="student-thread-messages" style="flex: 1; overflow-y: auto; padding: 20px; background: #f8fafc; display: flex; flex-direction: column; gap: 15px;">
+                <!-- Student's Initial Message -->
+                <div style="display: flex; justify-content: flex-end;">
+                    <div style="max-width: 70%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; border-bottom-right-radius: 4px;">
+                        <div style="font-size: 0.85rem; margin-bottom: 5px;">
+                            <strong>You</strong>
+                            <div style="font-size: 0.75rem; opacity: 0.8; margin-top: 2px;">${ticket.created_at}</div>
+                        </div>
+                        <div style="margin-top: 8px;">${ticket.description}</div>
+                    </div>
+                </div>
+                
+                <!-- Chat History -->
+                ${messages.length === 0 ? (ticket.admin_response ? `
+                    <div style="display: flex; justify-content: flex-start;">
+                        <div style="max-width: 70%; background: white; border: 1px solid #e2e8f0; padding: 12px; border-radius: 12px; border-bottom-left-radius: 4px; border-left: 3px solid #10b981;">
+                            <div style="font-size: 0.85rem; margin-bottom: 5px; color: #10b981;">
+                                <strong>👨‍💼 Admin</strong>
+                            </div>
+                            <div style="margin-top: 8px; color: var(--text-main);">${ticket.admin_response}</div>
+                        </div>
+                    </div>
+                    ` : '<div style="text-align: center; color: var(--text-muted); font-size: 0.9rem;"><i class="fa-solid fa-hourglass-end"></i> Waiting for admin response...</div>') : ''}
+                
+                ${messages.map(msg => {
+                    const isAdmin = msg.sender_type === 'ADMIN';
+                    return `
+                    <div style="display: flex; justify-content: ${isAdmin ? 'flex-start' : 'flex-end'};">
+                        <div style="max-width: 70%; ${isAdmin ? 'background: white; border: 1px solid #e2e8f0; border-left: 3px solid #10b981;' : 'background: #3b82f6; color: white;'} padding: 12px; border-radius: 12px; ${isAdmin ? 'border-bottom-left-radius: 4px;' : 'border-bottom-right-radius: 4px;'}">
+                            <div style="font-size: 0.85rem; margin-bottom: 5px; ${isAdmin ? 'color: #10b981;' : ''}">
+                                <strong>${isAdmin ? '👨‍💼 Admin' : 'You'}</strong>
+                                <div style="font-size: 0.75rem; opacity: 0.8; margin-top: 2px;">${msg.created_at}</div>
+                            </div>
+                            <div style="margin-top: 8px; ${isAdmin ? 'color: var(--text-main);' : ''}">${msg.message_text}</div>
+                        </div>
+                    </div>
+                    `;
+                }).join('')}
+            </div>
+            
+            <!-- Reply Input Area -->
+            <div style="padding: 15px; border-top: 1px solid #e2e8f0; background: white; display: flex; gap: 10px;">
+                <input type="text" id="ticket-reply-input" placeholder="Type your reply..." style="flex: 1; padding: 10px 15px; border: 1px solid #e2e8f0; border-radius: 20px; outline: none; font-size: 0.9rem;" />
+                <button onclick="sendTicketReply()" style="background: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-paper-plane"></i> Reply
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+    const threadMessages = document.getElementById('student-thread-messages');
+    if(threadMessages) threadMessages.scrollTop = threadMessages.scrollHeight;
+
+    } catch(err) {
+        console.error("Failed to fetch messages:", err);
+        container.innerHTML = '<p class="text-center text-danger mt-4">Failed to load chat.</p>';
+    }
+}
+
+async function deleteTicket(ticketId) {
+    if(!confirm("Are you sure you want to delete this chat permanently?")) return;
+    try {
+        const res = await fetch(`http://127.0.0.1:8000/api/ticket/${ticketId}`, {
+            method: 'DELETE'
+        });
+        if(res.ok) {
+            showToast("Chat deleted", "success");
+            loadMyTickets();
+        } else {
+            showToast("Failed to delete chat", "error");
+        }
+    } catch(err) {
+        showToast("Error deleting chat", "error");
+    }
+}
+
+async function sendTicketReply() {
+    const input = document.getElementById('ticket-reply-input');
+    const replyText = input.value.trim();
+    
+    if (!replyText) {
+        showToast('Please enter a message', 'error');
+        return;
+    }
+    
+    if (!currentOpenTicket) return;
+    
+    // Show reply in UI immediately
+    const threadDiv = document.querySelector('[style*="display: flex"][style*="flex-direction: column"]');
+    if (threadDiv) {
+        const messagesArea = threadDiv.querySelector('div[style*="flex: 1"]');
+        if (messagesArea) {
+            const replyDiv = document.createElement('div');
+            replyDiv.style.cssText = 'display: flex; justify-content: flex-end;';
+            replyDiv.innerHTML = `
+                <div style="max-width: 70%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; border-bottom-right-radius: 4px;">
+                    <div style="font-size: 0.85rem; margin-bottom: 5px;">
+                        <strong>You</strong>
+                        <div style="font-size: 0.75rem; opacity: 0.8; margin-top: 2px;">Just now</div>
+                    </div>
+                    <div style="margin-top: 8px;">${replyText}</div>
+                </div>
+            `;
+            messagesArea.appendChild(replyDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+    }
+    
+    // Clear input
+    input.value = '';
+    
+    try {
+        // Send to backend - add message to ticket message history
+        const res = await fetch(`http://127.0.0.1:8000/api/ticket/${currentOpenTicket.id}/add-message`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sender_type: 'STUDENT',
+                sender_id: currentStudentId,
+                message_text: replyText
+            })
+        });
+
+        if (!res.ok) {
+            console.error('Failed to save reply to database');
+        }
+    } catch (error) {
+        console.error('Error sending reply:', error);
+    }
+    
+    // Save to localStorage for persistence on student side
+    const chatKey = `ticket_replies_${currentOpenTicket.ticket_number}`;
+    const replies = JSON.parse(localStorage.getItem(chatKey) || '[]');
+    replies.push({
+        type: 'student',
+        text: replyText,
+        timestamp: new Date().toISOString()
+    });
+    localStorage.setItem(chatKey, JSON.stringify(replies));
+    
+    showToast('Reply sent', 'success');
 }
 
 // ==========================================

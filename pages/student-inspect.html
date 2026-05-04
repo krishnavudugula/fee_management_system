@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Fee Inspection</title>
+    <link rel="stylesheet" href="/styles/student-inspect.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="inspect-page">
+        <header class="page-header">
+            <div>
+                <h1><i class="fa-solid fa-magnifying-glass-dollar"></i> Student Fee Inspector</h1>
+                <p id="student-subtitle">Review complete fee ledger, dues, and payment history.</p>
+            </div>
+            <div class="header-actions">
+                <button id="send-alert-btn" class="btn btn-warning" disabled>
+                    <i class="fa-solid fa-bell"></i> Send Alert
+                </button>
+                <a href="/admin-dashboard" class="btn btn-outline">
+                    <i class="fa-solid fa-arrow-left"></i> Back To Admin
+                </a>
+            </div>
+        </header>
+
+        <section class="summary-grid">
+            <article class="summary-card">
+                <h3>Student</h3>
+                <p id="summary-name">-</p>
+                <span id="summary-roll">-</span>
+            </article>
+            <article class="summary-card">
+                <h3>Allocated</h3>
+                <p id="summary-allocated">₹ 0</p>
+                <span>Total fees assigned</span>
+            </article>
+            <article class="summary-card">
+                <h3>Paid</h3>
+                <p id="summary-paid">₹ 0</p>
+                <span>Verified payments</span>
+            </article>
+            <article class="summary-card due-card">
+                <h3>Outstanding</h3>
+                <p id="summary-due">₹ 0</p>
+                <span>Current due amount</span>
+            </article>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Fee Category Breakdown</h2>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fee Category</th>
+                            <th>Total</th>
+                            <th>Paid</th>
+                            <th>Due</th>
+                            <th>Pending Approval</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dues-table-body">
+                        <tr><td colspan="6" class="empty">Loading fee details...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Payment Transactions</h2>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Category</th>
+                            <th>Amount</th>
+                            <th>UTR</th>
+                            <th>Status</th>
+                            <th>Proof</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactions-table-body">
+                        <tr><td colspan="6" class="empty">Loading payment history...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="/scripts/student-inspect.js"></script>
+</body>
+</html>

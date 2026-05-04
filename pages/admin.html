@@ -31,7 +31,7 @@
                     <i class="fa-solid fa-file-signature"></i> Verification Queue <span class="badge pulse" id="verification-badge" style="display: none;">0</span>
                 </li>
                 <li class="nav-item" data-target="reports">
-                    <i class="fa-solid fa-file-excel"></i> Reports & Exports
+                      <i class="fa-solid fa-file-csv"></i> Reports & Exports
                 </li>
                 <li class="nav-item" data-target="support">
                     <i class="fa-solid fa-headset"></i> Support Desk <span class="badge" id="support-badge" style="display: none;">0</span>
@@ -154,12 +154,11 @@
                                     <option value="CSE">Computer Science Engineering (CSE)</option>
                                     <option value="CSD">Computer Science and Design (CSD)</option>
                                     <option value="AI&ML">Artificial Intelligence and Machine Learning (AI&ML)</option>
-                                    <option value="SE">Software Engineering</option>
+                                    <option value="SE">Software Engineering (SE)</option>
                                     <option value="EEE">Electrical & Electronics Engineering (EEE)</option>
                                     <option value="ME">Mechanical Engineering (ME)</option>
                                     <option value="CE">Civil Engineering (CE)</option>
                                     <option value="ECE">Electronics & Communication Engineering (ECE)</option>
-                                    <option value="DSE">Data Science Engineering</option>
                                     <option value="IoT">Internet of Things (IoT)</option>
                                 </select>
                             </div>
@@ -181,8 +180,7 @@
                                 <th>Fee Title</th>
                                 <th>Target Group</th>
                                 <th>Amount</th>
-                                <th>Status</th>
-                            </tr>
+                                <th>Status</th>                                  <th>Actions</th>                            </tr>
                         </thead>
                         <tbody id="fee-history-table">
                             </tbody>
@@ -392,7 +390,7 @@
 
                 <div class="glass-panel propose-fee-container">
                     <div class="propose-graphic">
-                        <i class="fa-solid fa-file-excel fa-5x text-success" style="opacity: 0.8;"></i>
+                          <i class="fa-solid fa-file-csv fa-5x text-success" style="opacity: 0.8;"></i>
                     </div>
                     <div class="propose-form">
                         <h2>Branch-Wise Due Report</h2>
@@ -405,18 +403,17 @@
                                 <option value="CSE">Computer Science Engineering (CSE)</option>
                                 <option value="CSD">Computer Science and Design (CSD)</option>
                                 <option value="AI&ML">Artificial Intelligence and Machine Learning (AI&ML)</option>
-                                <option value="SE">Software Engineering</option>
+                                <option value="SE">Software Engineering (SE)</option>
                                 <option value="EEE">Electrical & Electronics Engineering (EEE)</option>
                                 <option value="ME">Mechanical Engineering (ME)</option>
                                 <option value="CE">Civil Engineering (CE)</option>
                                 <option value="ECE">Electronics & Communication Engineering (ECE)</option>
-                                <option value="DSE">Data Science Engineering</option>
                                 <option value="IoT">Internet of Things (IoT)</option> 
                                 <option value="ALL">All Branches (Full Institute)</option>
                             </select>
                         </div>
-                        <button class="btn btn-success btn-lg w-100 mt-3" id="btn-download-excel" onclick="downloadBranchReport()">
-                            <i class="fa-solid fa-download"></i> Generate & Download Excel (.xlsx)
+                          <button class="btn btn-success btn-lg w-100 mt-3" id="btn-download-csv" onclick="downloadBranchReport()">
+                              <i class="fa-solid fa-download"></i> Generate & Download CSV (.csv)
                         </button>
                     </div>
                 </div>
@@ -450,7 +447,10 @@
                                     <h2 id="thread-subject" class="text-primary mb-1">Issue Subject</h2>
                                     <p class="text-sm text-muted">From: <strong id="thread-student">Student Name</strong> | Ticket <span id="thread-id">#000</span></p>
                                 </div>
-                                <button class="btn btn-success" onclick="resolveTicket()"><i class="fa-solid fa-check"></i> Mark Resolved</button>
+                                <div style="display: flex; gap: 10px;">
+                                    <button class="btn btn-danger" onclick="deleteTicketAdmin()"><i class="fa-solid fa-trash"></i> Delete Chat</button>
+                                    <button class="btn btn-success" onclick="resolveTicket()"><i class="fa-solid fa-check"></i> Mark Resolved</button>
+                                </div>
                             </div>
                             
                             <div class="thread-body p-4" id="thread-messages">
@@ -465,7 +465,7 @@
                                     <button class="btn btn-outline btn-sm"><i class="fa-solid fa-paperclip"></i> Attach File</button>
                                     <div class="d-flex-between" style="gap: 10px;">
                                         <button class="btn btn-warning" onclick="updateTicketStatus('IN_PROGRESS')">Mark In Progress</button>
-                                        <button class="btn btn-primary" onclick="updateTicketStatus('IN_PROGRESS')">Send Reply <i class="fa-solid fa-paper-plane"></i></button>
+                                        <button class="btn btn-primary" onclick="sendReplyOnly()">Send Reply <i class="fa-solid fa-paper-plane"></i></button>
                                     </div>
                                 </div>
                             </div>

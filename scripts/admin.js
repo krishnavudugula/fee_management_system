@@ -50,6 +50,14 @@ function dismissAlertedRows(rollNumbers = []) {
     }, 320);
 }
 
+function openStudentInspector(rollNumber) {
+    if (!rollNumber) {
+        showToast('Student roll number not found.', 'error');
+        return;
+    }
+    window.location.href = `/admin/student-inspect?roll=${encodeURIComponent(rollNumber)}`;
+}
+
 async function loadDashboardData() {
     try {
         const response = await fetch('http://127.0.0.1:8000/api/admin/dashboard-stats');
@@ -116,6 +124,9 @@ function renderDefaulters(list) {
                 <td style="color:var(--danger); font-weight:700;">₹ ${student.due.toLocaleString('en-IN')}</td>
                 <td><span style="background: #fecaca; color: #b91c1c; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem;">Overdue</span></td>
                 <td>
+                    <button class="inspect-student-btn" data-roll-number="${encodeURIComponent(student.id || '')}" style="border:none; background:transparent; cursor:pointer; color: var(--primary); margin-right: 8px;" title="Inspect Fee Details">
+                        <i class="fa-solid fa-magnifying-glass-dollar"></i>
+                    </button>
                     <button class="alert-single-btn" data-student-name="${encodeURIComponent(student.name || '')}" data-roll-number="${encodeURIComponent(student.id || '')}" style="border:none; background:transparent; cursor:pointer; color: var(--text-muted);">
                         <i class="fa-regular fa-bell"></i>
                     </button>
@@ -259,7 +270,7 @@ function renderFeeHistory(proposals) {
     tbody.innerHTML = '';
 
     if (proposals.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color: var(--text-muted);">No recent fee proposals.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 20px; color: var(--text-muted);">No recent fee proposals.</td></tr>`;
         return;
     }
 
@@ -271,9 +282,35 @@ function renderFeeHistory(proposals) {
                 <td><span class="badge" style="background: #e2e8f0; color: #475569;">${fee.target_audience}</span></td>
                 <td style="font-weight:700;">₹ ${fee.amount.toLocaleString('en-IN')}</td>
                 <td><span class="status-active">Active</span></td>
+                <td>
+                    <button class="btn btn-danger btn-sm" onclick="deleteFeeProposal(${fee.id})" style="padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; background: #ef4444; color: white; border: none; cursor: pointer;">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                </td>
             </tr>
         `;
     });
+}
+
+async function deleteFeeProposal(id) {
+    if(!confirm("Are you sure you want to delete this fee proposal? This will also remove the pending unpaid dues for students.")) return;
+    
+    try {
+        const response = await fetch(`http://127.0.0.1:8000/api/admin/fee-proposals/${id}`, {
+            method: 'DELETE',
+        });
+        
+        if (response.ok) {
+            showToast("Fee proposal deleted successfully", "success");
+            loadFeeHistory();
+        } else {
+            const errData = await response.json();
+            showToast(errData.detail || "Failed to delete fee proposal", "error");
+        }
+    } catch (err) {
+        console.error(err);
+        showToast("An error occurred", "error");
+    }
 }
 
 // Load fee history on page load
@@ -670,10 +707,10 @@ function downloadBranchReport() {
         return;
     }
 
-    const btn = document.getElementById('btn-download-excel');
+    const btn = document.getElementById('btn-download-csv');
     const originalText = btn.innerHTML;
 
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing Excel...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing CSV...';
     btn.disabled = true;
 
     const url = `http://127.0.0.1:8000/api/admin/export-dues?branch=${encodeURIComponent(selectedBranch)}`;
@@ -768,22 +805,103 @@ function openTicket(index) {
     if (emptyThread) emptyThread.style.display = 'none';
     if (thread) thread.style.display = 'flex';
 
-    // Populate Data
+    // Populate Header Data
     const threadSubject = document.getElementById('thread-subject');
     const threadStudent = document.getElementById('thread-student');
     const threadId = document.getElementById('thread-id');
-    const threadDesc = document.getElementById('thread-desc');
-    const responseArea = document.getElementById('response-area');
     
     if (threadSubject) threadSubject.innerText = currentTicket.subject;
     if (threadStudent) threadStudent.innerText = `${currentTicket.student_name} (${currentTicket.student_roll})`;
     if (threadId) threadId.innerText = `#${currentTicket.ticket_number}`;
-    if (threadDesc) threadDesc.innerText = currentTicket.description;
     
-    // Show existing response if any
+    // Load message history from database
+    loadTicketMessages();
+    
+    // Clear the textarea for NEW replies
+    const responseArea = document.getElementById('response-area');
     if (responseArea) {
-        responseArea.value = currentTicket.admin_response || '';
+        responseArea.value = '';
+        responseArea.focus();
     }
+}
+
+async function loadTicketMessages() {
+    if (!currentTicket) return;
+    
+    try {
+        const response = await fetch(`http://127.0.0.1:8000/api/ticket/${currentTicket.id}/messages`);
+        if (!response.ok) throw new Error('Failed to load messages');
+        
+        const data = await response.json();
+        const messages = data.messages || [];
+        
+        const threadMessages = document.getElementById('thread-messages');
+        if (threadMessages) {
+            threadMessages.innerHTML = '';
+            
+            // Always show the initial ticket description first
+            const studentMsgDiv = document.createElement('div');
+            studentMsgDiv.className = 'message-box student-msg';
+            studentMsgDiv.style.marginBottom = '15px';
+            studentMsgDiv.innerHTML = `
+                <strong style="display: block; margin-bottom: 8px; color: var(--primary);">Student: ${currentTicket.student_name}</strong>
+                <p style="margin: 0; white-space: pre-wrap;">${currentTicket.description}</p>
+                <small style="color: var(--text-muted); display: block; margin-top: 8px;">${currentTicket.created_at}</small>
+            `;
+            threadMessages.appendChild(studentMsgDiv);
+            
+            // Display all messages in order
+            messages.forEach(msg => {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = msg.sender_type === 'ADMIN' ? 'message-box admin-msg' : 'message-box student-msg';
+                msgDiv.style.marginBottom = '15px';
+                msgDiv.innerHTML = `
+                    <strong style="display: block; margin-bottom: 8px; color: ${msg.sender_type === 'ADMIN' ? 'var(--success)' : 'var(--primary)'};">
+                        ${msg.sender_type === 'ADMIN' ? 'You (Admin)' : 'Student: ' + msg.sender_name}
+                    </strong>
+                    <p style="margin: 0; white-space: pre-wrap;">${msg.message_text}</p>
+                    <small style="color: var(--text-muted); display: block; margin-top: 8px;">${msg.created_at}</small>
+                `;
+                threadMessages.appendChild(msgDiv);
+            });
+            
+            // Auto-scroll to bottom
+            threadMessages.scrollTop = threadMessages.scrollHeight;
+        }
+    } catch (err) {
+        console.error('Failed to load message history:', err);
+        showToast('Failed to load messages', 'error');
+    }
+}
+
+async function deleteTicketAdmin() {
+    if (!currentTicket) return;
+    
+    openConfirmModal(
+        "Delete Chat",
+        `Are you sure you want to permanently delete ticket <strong>#${currentTicket.ticket_number}</strong> and all its messages?`,
+        '<i class="fa-solid fa-trash text-danger"></i>',
+        async () => {
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/ticket/${currentTicket.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!res.ok) throw new Error('Failed to delete chat');
+                
+                showToast("Chat deleted successfully", "success");
+                
+                // Hide active thread and fetch updated tickets
+                document.getElementById('active-thread').style.display = 'none';
+                document.getElementById('empty-thread').style.display = 'block';
+                currentTicket = null;
+                
+                fetchSupportTickets();
+            } catch (error) {
+                showToast(error.message || 'Error deleting chat', 'error');
+            }
+        }
+    );
 }
 
 async function resolveTicket() {
@@ -826,11 +944,11 @@ async function resolveTicket() {
     );
 }
 
-async function updateTicketStatus(status) {
+async function sendReplyOnly() {
     if(!currentTicket) return;
     
-    const response = document.getElementById('response-area').value;
-    if (!response || !response.trim()) {
+    const responseText = document.getElementById('response-area').value;
+    if (!responseText || !responseText.trim()) {
         showToast('Please enter a response', 'error');
         return;
     }
@@ -840,7 +958,41 @@ async function updateTicketStatus(status) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                response: response,
+                response: responseText,
+                status: currentTicket.status  // Keep current status
+            })
+        });
+
+        if (!res.ok) throw new Error('Failed to send reply');
+
+        showToast('Reply sent successfully', "success");
+        
+        // Clear the textarea
+        const responseArea = document.getElementById('response-area');
+        if (responseArea) responseArea.value = '';
+        
+        // Reload message thread to show the new message
+        await loadTicketMessages();
+    } catch (error) {
+        showToast(error.message || 'Failed to send reply', 'error');
+    }
+}
+
+async function updateTicketStatus(status) {
+    if(!currentTicket) return;
+    
+    const responseText = document.getElementById('response-area').value;
+    if (!responseText || !responseText.trim()) {
+        showToast('Please enter a response', 'error');
+        return;
+    }
+
+    try {
+        const res = await fetch(`http://127.0.0.1:8000/api/admin/ticket/${currentTicket.id}/respond`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                response: responseText,
                 status: status
             })
         });
@@ -848,7 +1000,13 @@ async function updateTicketStatus(status) {
         if (!res.ok) throw new Error('Failed to update ticket');
 
         showToast(`Ticket updated to ${status}`, "success");
-        await loadSupportTickets();
+        
+        // Clear the textarea
+        const responseArea = document.getElementById('response-area');
+        if (responseArea) responseArea.value = '';
+        
+        // Reload message thread to show the new message
+        await loadTicketMessages();
     } catch (error) {
         showToast(error.message || 'Failed to update ticket', 'error');
     }
@@ -958,6 +1116,9 @@ function renderStudentsTable(studentsList) {
                     <button class="view-btn" data-student-id="${student.id}" style="border:none; background:transparent; cursor:pointer; color: var(--primary); padding: 5px 10px; margin-right: 5px;" title="View Details">
                         <i class="fa-solid fa-eye"></i> View
                     </button>
+                    <button class="inspect-student-btn" data-roll-number="${encodeURIComponent(student.roll_number)}" style="border:none; background:transparent; cursor:pointer; color: var(--primary); padding: 5px 10px;" title="Inspect Fee Details">
+                        <i class="fa-solid fa-magnifying-glass-dollar"></i>
+                    </button>
                     <button class="send-alert-btn" data-student-name="${encodeURIComponent(student.full_name)}" data-roll-number="${encodeURIComponent(student.roll_number)}" style="border:none; background:transparent; cursor:pointer; color: #f59e0b; padding: 5px 10px;" title="Send Alert">
                         <i class="fa-solid fa-bell"></i>
                     </button>
@@ -1029,6 +1190,12 @@ async function performDelete(studentId, studentName) {
 
 // Event delegation for table buttons
 document.addEventListener('click', (e) => {
+    if(e.target.closest('.inspect-student-btn')) {
+        const btn = e.target.closest('.inspect-student-btn');
+        const rollNumber = decodeURIComponent(btn.getAttribute('data-roll-number') || '');
+        openStudentInspector(rollNumber);
+        return;
+    }
     if(e.target.closest('.alert-single-btn')) {
         const btn = e.target.closest('.alert-single-btn');
         const studentName = decodeURIComponent(btn.getAttribute('data-student-name') || 'Student');

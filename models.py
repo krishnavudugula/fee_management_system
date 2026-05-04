@@ -106,3 +106,14 @@ class SupportTicket(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     resolved_at = Column(DateTime, nullable=True)
     admin_response = Column(String, nullable=True)
+
+
+class TicketMessage(Base):
+    __tablename__ = "ticket_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("support_tickets.id"), nullable=False)
+    sender_type = Column(String, nullable=False)  # "STUDENT" or "ADMIN"
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    message_text = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

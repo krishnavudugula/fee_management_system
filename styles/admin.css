@@ -175,8 +175,13 @@ body { background: var(--bg-main); color: var(--text-main); height: 100vh; overf
 .ticket-preview { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
 .thread-header { background: #f8fafc; }
 .thread-body { flex: 1; overflow-y: auto; }
-.message-box { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; background: white; }
-.student-msg { background: #f8fafc; }
+.message-box { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; background: white; margin-bottom: 12px; }
+.message-box p { margin: 8px 0; line-height: 1.5; }
+.message-box strong { color: var(--primary); display: block; margin-bottom: 4px; }
+.message-box small { display: block; margin-top: 8px; }
+.student-msg { background: #f8fafc; border-left: 4px solid var(--accent); }
+.admin-msg { background: #e0f2fe; border-left: 4px solid var(--success); }
+.admin-msg strong { color: var(--success); }
 .thread-reply { background: #f8fafc; }
 .bg-main { background: var(--bg-main); }
 

@@ -653,6 +653,86 @@ def get_all_students(db: Session = Depends(get_db)):
     
     return {"students": result}
 
+
+@app.get("/api/admin/student-fee-details/{roll_number}")
+def get_student_fee_details(roll_number: str, db: Session = Depends(get_db)):
+    """Get a full fee and payment inspection view for a single student by roll number."""
+    student = db.query(models.User).filter(
+        models.User.role == models.RoleType.STUDENT,
+        models.User.roll_number == roll_number
+    ).first()
+
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    dues = db.query(models.StudentDue).filter(
+        models.StudentDue.student_id == student.id
+    ).all()
+
+    pending_transactions = db.query(models.Transaction).filter(
+        models.Transaction.student_id == student.id,
+        models.Transaction.status == models.TransactionStatus.PENDING_APPROVAL
+    ).all()
+    pending_by_category = {}
+    for txn in pending_transactions:
+        pending_by_category[txn.fee_category_id] = pending_by_category.get(txn.fee_category_id, 0) + txn.amount_paid
+
+    dues_payload = []
+    total_allocated = 0.0
+    total_paid = 0.0
+
+    for due in dues:
+        category_title = due.fee_category.title if due.fee_category else "Fee Payment"
+        remaining_amount = max((due.total_amount or 0) - (due.paid_amount or 0), 0)
+        pending_approval = pending_by_category.get(due.fee_category_id, 0)
+
+        total_allocated += due.total_amount or 0
+        total_paid += due.paid_amount or 0
+
+        dues_payload.append({
+            "fee_category_id": due.fee_category_id,
+            "category": category_title,
+            "total": due.total_amount or 0,
+            "paid": due.paid_amount or 0,
+            "remaining": remaining_amount,
+            "pending_approval": pending_approval,
+            "status": due.status.value if due.status else "PENDING",
+            "is_proposed": bool(due.is_proposed)
+        })
+
+    transactions = db.query(models.Transaction).filter(
+        models.Transaction.student_id == student.id
+    ).order_by(models.Transaction.submitted_at.desc()).all()
+
+    transactions_payload = []
+    for txn in transactions:
+        transactions_payload.append({
+            "transaction_id": txn.id,
+            "category": get_fee_category_title(db, txn.fee_category_id),
+            "amount": txn.amount_paid,
+            "utr": txn.utr_number,
+            "status": txn.status.value if txn.status else "PENDING_APPROVAL",
+            "submitted_at": txn.submitted_at.strftime("%d %b %Y, %I:%M %p") if txn.submitted_at else "",
+            "proof_url": txn.receipt_proof_url
+        })
+
+    return {
+        "student": {
+            "id": student.id,
+            "full_name": student.full_name,
+            "roll_number": student.roll_number,
+            "branch": student.branch,
+            "email": student.email
+        },
+        "summary": {
+            "total_allocated": total_allocated,
+            "total_paid": total_paid,
+            "total_due": max(total_allocated - total_paid, 0)
+        },
+        "dues": dues_payload,
+        "transactions": transactions_payload
+    }
+
 @app.delete("/api/admin/delete-student/{student_id}")
 async def delete_student(student_id: int, db: Session = Depends(get_db)):
     """Delete a student and all their associated records"""
@@ -745,6 +825,47 @@ def get_fee_proposals(db: Session = Depends(get_db)):
     return {"proposals": proposals}
 
 
+@app.delete("/api/admin/fee-proposals/{proposal_id}")
+def delete_fee_proposal(proposal_id: int, db: Session = Depends(get_db)):
+    """Delete a fee proposal and its unpaid dues"""
+    try:
+        # Check if the fee category exists
+        fee_category = db.query(models.FeeCategory).filter(models.FeeCategory.id == proposal_id).first()
+        if not fee_category:
+            raise HTTPException(status_code=404, detail="Fee proposal not found")
+        
+        # Check if any dues are already paid for this category
+        paid_dues = db.query(models.StudentDue).filter(
+            models.StudentDue.fee_category_id == proposal_id,
+            models.StudentDue.paid_amount > 0
+        ).count()
+        
+        if paid_dues > 0:
+            raise HTTPException(status_code=400, detail="Cannot delete proposal: Some students have already made payments towards this fee.")
+            
+        # Check if there are any transactions tied to this fee category
+        transactions_count = db.query(models.Transaction).filter(
+            models.Transaction.fee_category_id == proposal_id
+        ).count()
+
+        if transactions_count > 0:
+            raise HTTPException(status_code=400, detail="Cannot delete proposal: There are transactions (pending or verified) tied to this fee.")
+
+        # Delete related unpaid dues
+        db.query(models.StudentDue).filter(models.StudentDue.fee_category_id == proposal_id).delete(synchronize_session=False)
+        
+        # Delete the fee category
+        db.delete(fee_category)
+        db.commit()
+        return {"message": "Fee proposal deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete proposal: {str(e)}")
+
+
 # ==========================================
 # SUPPORT TICKET ENDPOINTS
 # ==========================================
@@ -802,33 +923,10 @@ def get_all_support_tickets(db: Session = Depends(get_db)):
     return {"tickets": result}
 
 
-@app.post("/api/admin/ticket/{ticket_id}/respond")
-def respond_to_ticket(ticket_id: int, payload: TicketResponseRequest, db: Session = Depends(get_db)):
-    """Admin responds to a support ticket"""
-    ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    try:
-        ticket.admin_response = payload.response
-        ticket.status = models.TicketStatus[payload.status]
-        
-        if payload.status in ["RESOLVED", "CLOSED"]:
-            ticket.resolved_at = datetime.utcnow()
-
-        db.commit()
-        return {"message": "Ticket updated successfully"}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to update ticket: {str(e)}")
-
-
 @app.get("/api/student/my-tickets/{student_id}")
 def get_student_tickets(student_id: int, db: Session = Depends(get_db)):
-    """Student gets their own tickets"""
-    tickets = db.query(models.SupportTicket).filter(
-        models.SupportTicket.student_id == student_id
-    ).order_by(models.SupportTicket.created_at.desc()).all()
+    """Student gets their own support tickets"""
+    tickets = db.query(models.SupportTicket).filter(models.SupportTicket.student_id == student_id).order_by(models.SupportTicket.created_at.desc()).all()
     
     result = []
     for ticket in tickets:
@@ -846,16 +944,167 @@ def get_student_tickets(student_id: int, db: Session = Depends(get_db)):
     return {"tickets": result}
 
 
+@app.post("/api/admin/ticket/{ticket_id}/respond")
+def respond_to_ticket(ticket_id: int, payload: TicketResponseRequest, db: Session = Depends(get_db)):
+    """Admin responds to a support ticket"""
+    ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    try:
+        # Update ticket status and mark resolved_at if needed
+        ticket.admin_response = payload.response  # Keep for backward compatibility
+        ticket.status = models.TicketStatus[payload.status]
+        
+        if payload.status in ["RESOLVED", "CLOSED"]:
+            ticket.resolved_at = datetime.utcnow()
+
+        # Add message to message history
+        message = models.TicketMessage(
+            ticket_id=ticket_id,
+            sender_type="ADMIN",
+            sender_id=1,  # System admin ID (adjust if needed)
+            message_text=payload.response
+        )
+        db.add(message)
+        db.commit()
+        db.refresh(ticket)
+        
+        # Send Notification to Student
+        push_alert_for_student(
+            ticket.student_id,
+            f"Ticket Response: {ticket.ticket_number}",
+            f"Admin responded: {payload.response[:100]}...",
+            notification_type="INFO"
+        )
+        
+        return {"message": "Ticket updated successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update ticket: {str(e)}")
+
+
+@app.get("/api/ticket/{ticket_id}/messages")
+def get_ticket_messages(ticket_id: int, db: Session = Depends(get_db)):
+    """Get all messages for a ticket (message history)"""
+    try:
+        ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        messages = db.query(models.TicketMessage).filter(
+            models.TicketMessage.ticket_id == ticket_id
+        ).order_by(models.TicketMessage.created_at.asc()).all()
+        
+        result = []
+        for msg in messages:
+            sender = db.query(models.User).filter(models.User.id == msg.sender_id).first()
+            result.append({
+                "id": msg.id,
+                "ticket_id": msg.ticket_id,
+                "sender_type": msg.sender_type,
+                "sender_name": sender.full_name if sender else "System",
+                "message_text": msg.message_text,
+                "created_at": msg.created_at.strftime("%d %b %Y, %I:%M %p") if msg.created_at else ""
+            })
+        
+        return {"messages": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch messages: {str(e)}")
+
+
+@app.post("/api/ticket/{ticket_id}/add-message")
+def add_ticket_message(ticket_id: int, payload: dict, db: Session = Depends(get_db)):
+    """Add a message to a ticket (for student replies or admin messages)"""
+    try:
+        ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        message = models.TicketMessage(
+            ticket_id=ticket_id,
+            sender_type=payload.get("sender_type"),  # "STUDENT" or "ADMIN"
+            sender_id=payload.get("sender_id"),
+            message_text=payload.get("message_text")
+        )
+        db.add(message)
+        db.commit()
+        
+        return {
+            "id": message.id,
+            "message": "Message added successfully",
+            "created_at": message.created_at.strftime("%d %b %Y, %I:%M %p")
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to add message: {str(e)}")
+
+
+@app.delete("/api/ticket/{ticket_id}")
+def delete_ticket(ticket_id: int, db: Session = Depends(get_db)):
+    """Delete a ticket and all its messages (for both users)"""
+    try:
+        ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+            
+        # Delete related messages first
+        db.query(models.TicketMessage).filter(models.TicketMessage.ticket_id == ticket_id).delete(synchronize_session=False)
+        
+        # Delete the ticket
+        db.delete(ticket)
+        db.commit()
+        
+        return {"message": "Chat deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete chat: {str(e)}")
+
+
+
 # ==========================================
-# EXCEL EXPORT ENDPOINT
+# CLEAR DATA ENDPOINTS (ADMIN ONLY)
+# ==========================================
+@app.post("/api/admin/clear-notifications")
+def clear_all_notifications():
+    """Clear all notifications from ALERT_STORE"""
+    global ALERT_STORE
+    ALERT_STORE.clear()
+    return {"message": "All notifications cleared successfully"}
+
+@app.delete("/api/admin/clear-tickets")
+def clear_all_tickets(db: Session = Depends(get_db)):
+    """Delete all support tickets from database"""
+    try:
+        db.query(models.SupportTicket).delete(synchronize_session=False)
+        db.commit()
+        return {"message": "All support tickets deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to clear tickets: {str(e)}")
+
+@app.post("/api/admin/clear-all")
+def clear_all_data(db: Session = Depends(get_db)):
+    """Clear all notifications and tickets (Master Clear)"""
+    try:
+        global ALERT_STORE
+        ALERT_STORE.clear()
+        db.query(models.SupportTicket).delete(synchronize_session=False)
+        db.commit()
+        return {"message": "All notifications and tickets cleared successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to clear data: {str(e)}")
+
+# ==========================================
+# CSV EXPORT ENDPOINT
 # ==========================================
 @app.get("/api/admin/export-dues")
 def export_branch_dues(branch: str = "ALL", db: Session = Depends(get_db)):
-    """Export branch-wise due report as Excel"""
+    """Export branch-wise due report as CSV"""
     try:
         import io
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment, PatternFill
+        import csv
         
         # Query students based on branch
         if branch.upper() == "ALL":
@@ -866,71 +1115,38 @@ def export_branch_dues(branch: str = "ALL", db: Session = Depends(get_db)):
                 models.User.branch == branch
             ).all()
 
-        # Create workbook
-        wb = Workbook()
-        ws = wb.active
-        ws.title = f"{branch} Dues Report"
-
-        # Header styling
-        header_fill = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid")
-        header_font = Font(bold=True, color="FFFFFF", size=12)
-        header_alignment = Alignment(horizontal="center", vertical="center")
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
 
         # Headers
         headers = ["Roll Number", "Student Name", "Branch", "Total Allocated", "Total Paid", "Total Due"]
-        ws.append(headers)
-        
-        for cell in ws[1]:
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = header_alignment
+        writer.writerow(headers)
 
         # Data rows
         for student in students:
             dues = db.query(models.StudentDue).filter(models.StudentDue.student_id == student.id).all()
-            
+
             total_allocated = sum(due.total_amount for due in dues)
             total_paid = sum(due.paid_amount for due in dues)
             total_due = total_allocated - total_paid
 
-            ws.append([
+            writer.writerow([
                 student.roll_number,
                 student.full_name,
                 student.branch,
-                f"₹{total_allocated:,.2f}",
-                f"₹{total_paid:,.2f}",
-                f"₹{total_due:,.2f}"
+                f"{total_allocated:.2f}",
+                f"{total_paid:.2f}",
+                f"{total_due:.2f}"
             ])
 
-        # Adjust column widths
-        for column in ws.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max_length + 2, 50)
-            ws.column_dimensions[column_letter].width = adjusted_width
-
-        # Save to BytesIO
-        output = io.BytesIO()
-        wb.save(output)
         output.seek(0)
-
-        filename = f"{branch}_Dues_Report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        filename = f"{branch}_Dues_Report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
         
         return StreamingResponse(
-            output,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            iter([output.getvalue()]),
+            media_type="text/csv",
             headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    except ImportError:
-        raise HTTPException(
-            status_code=500, 
-            detail="openpyxl library not installed. Run: pip install openpyxl"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
@@ -944,6 +1160,17 @@ async def serve_login():
 async def serve_admin():
     return FileResponse('pages/admin.html')
 
+@app.get("/admin/student-inspect")
+async def serve_student_inspect():
+    return FileResponse('pages/student-inspect.html')
+
 @app.get("/student-dashboard")
 async def serve_student():
     return FileResponse('pages/student.html')
+# trigger reload
+
+# force reload admin response
+
+# Fixed errors - production ready
+
+# New clear endpoints added
